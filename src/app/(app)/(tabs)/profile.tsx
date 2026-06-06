@@ -7,7 +7,7 @@ import { colors, fontSize, radius, spacing } from "@/theme/colors";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-export default function HomeScreen() {
+export default function ProfileScreen() {
   const {
     user,
     logout,
@@ -52,17 +52,13 @@ export default function HomeScreen() {
   }
 
   return (
-    <Screen scroll>
-      {/* Pozdravna kartica */}
+    <Screen scroll edges={["bottom"]}>
       <View style={styles.card}>
         <Text style={styles.welcome}>Dobrodošli 👋</Text>
         <Text style={styles.email}>{user?.email}</Text>
-        <Text style={styles.note}>
-          Uspješno ste prijavljeni. Ovo je početni ekran aplikacije (Sprint 1).
-        </Text>
+        <Text style={styles.note}>Prijavljeni ste na svoj račun.</Text>
       </View>
 
-      {/* Sigurnost / biometrija */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Sigurnost</Text>
 
@@ -73,8 +69,7 @@ export default function HomeScreen() {
         ) : biometricEnabled ? (
           <>
             <Text style={styles.muted}>
-              Biometrijska prijava je uključena. Sljedeći put se možete prijaviti
-              otiskom prsta ili Face ID-em.
+              Biometrijska prijava je uključena.
             </Text>
             <Button
               title="Isključi biometrijsku prijavu"
@@ -121,37 +116,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  welcome: {
-    fontSize: fontSize.xl,
-    fontWeight: "700",
-    color: colors.text,
-  },
+  welcome: { fontSize: fontSize.xl, fontWeight: "700", color: colors.text },
   email: {
     fontSize: fontSize.md,
     color: colors.primary,
     fontWeight: "600",
     marginTop: spacing.xs,
   },
-  note: {
-    fontSize: fontSize.sm,
-    color: colors.textMuted,
-    marginTop: spacing.sm,
-  },
+  note: { fontSize: fontSize.sm, color: colors.textMuted, marginTop: spacing.sm },
   sectionTitle: {
     fontSize: fontSize.lg,
     fontWeight: "700",
     color: colors.text,
     marginBottom: spacing.sm,
   },
-  muted: {
-    fontSize: fontSize.sm,
-    color: colors.textMuted,
-    marginBottom: spacing.sm,
-  },
-  mt: {
-    marginTop: spacing.xs,
-  },
-  logout: {
-    marginTop: spacing.sm,
-  },
+  muted: { fontSize: fontSize.sm, color: colors.textMuted, marginBottom: spacing.sm },
+  mt: { marginTop: spacing.xs },
+  logout: { marginTop: spacing.sm },
 });

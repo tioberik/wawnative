@@ -22,8 +22,8 @@ function RootNavigator() {
       // Neprijavljen korisnik izvan auth grupe → na prijavu
       router.replace("/(auth)/login");
     } else if (isLoggedIn && inAuthGroup) {
-      // Prijavljen korisnik na auth ekranu → na početnu
-      router.replace("/(app)/home");
+      // Prijavljen korisnik na auth ekranu → na početnu (tabovi)
+      router.replace("/(app)/(tabs)");
     }
   }, [isLoggedIn, authReady, segments, router]);
 

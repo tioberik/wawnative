@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// Sigurnosna pravila za Firestore.
+// Svaki dokument ima polje ownerId (uid vlasnika). Korisnik smije čitati i
+// mijenjati ISKLJUČIVO svoje zapise. Neprijavljeni korisnici nemaju pristup.
+//
+// VAŽNO: za listanje (query) servisni sloj MORA filtrirati po ownerId
+// (where("ownerId", "==", uid)), inače Firestore odbija upit.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Pomoćna funkcija — da li je korisnik vlasnik postojećeg dokumenta
+    function isOwner() {
+      return request.auth != null && resource.data.ownerId == request.auth.uid;
+    }
+
+    // Pomoćna funkcija — da li novi dokument pripada prijavljenom korisniku
+    function isCreatingOwn() {
+      return request.auth != null
+        && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    match /customers/{customerId} {
+      allow read: if isOwner();
+      allow create: if isCreatingOwn();
+      allow update, delete: if isOwner();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isOwner();
+      allow create: if isCreatingOwn();
+      allow update, delete: if isOwner();
+    }
+  }
+}

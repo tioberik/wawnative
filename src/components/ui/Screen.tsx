@@ -7,22 +7,29 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 
 type Props = {
   children: ReactNode;
   scroll?: boolean;
   center?: boolean;
+  /** Safe-area rubovi. Ekrani sa headerom obično trebaju samo "bottom". */
+  edges?: Edge[];
 };
 
 /** Osnovni wrapper ekrana — safe area, padding, opcionalni scroll/centriranje. */
-export default function Screen({ children, scroll = false, center = false }: Props) {
+export default function Screen({
+  children,
+  scroll = false,
+  center = false,
+  edges = ["top", "bottom"],
+}: Props) {
   const content = (
     <View style={[styles.inner, center && styles.center]}>{children}</View>
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.safe} edges={edges}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
