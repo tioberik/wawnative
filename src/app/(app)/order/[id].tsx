@@ -2,19 +2,36 @@ import Button from "@/components/ui/Button";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import Screen from "@/components/ui/Screen";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { useAuth } from "@/contexts/AuthContext";
+import { pickFromCamera, pickFromLibrary } from "@/lib/imagePicker";
 import { openInGoogleMaps } from "@/lib/maps";
 import { getCustomer } from "@/services/customerService";
-import { deleteOrder, getOrder, updateOrderStatus } from "@/services/orderService";
+import {
+  addAttachment,
+  deleteOrder,
+  getOrder,
+  removeAttachment,
+  updateOrderStatus,
+} from "@/services/orderService";
+import { deleteAttachmentFiles, uploadAttachment } from "@/services/storageService";
 import { colors, fontSize, radius, spacing } from "@/theme/colors";
 import type { Customer } from "@/types/customer";
-import { ORDER_STATUSES, statusMeta, type Order, type OrderStatus } from "@/types/order";
+import {
+  ORDER_STATUSES,
+  statusMeta,
+  type Attachment,
+  type Order,
+  type OrderStatus,
+} from "@/types/order";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -23,12 +40,18 @@ import {
 
 export default function OrderDetailScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Prilozi
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [viewer, setViewer] = useState<Attachment | null>(null);
 
   // Učitaj narudžbu + kupca svaki put kad ekran dobije fokus
   // (npr. nakon povratka iz uređivanja).
@@ -89,6 +112,64 @@ export default function OrderDetailScreen() {
             router.back();
           } catch {
             setError("Greška pri brisanju narudžbe.");
+          }
+        },
+      },
+    ]);
+  }
+
+  // Ponudi izbor izvora slike (kamera ili galerija)
+  function handleAddPhoto() {
+    Alert.alert("Dodaj fotografiju", "Odaberite izvor", [
+      { text: "Kamera", onPress: () => addPhoto("camera") },
+      { text: "Galerija", onPress: () => addPhoto("library") },
+      { text: "Otkaži", style: "cancel" },
+    ]);
+  }
+
+  async function addPhoto(source: "camera" | "library") {
+    if (!user || !id || !order) return;
+    setError(null);
+
+    const uri =
+      source === "camera" ? await pickFromCamera() : await pickFromLibrary();
+    if (!uri) return; // otkazano ili dozvola odbijena
+
+    setUploading(true);
+    setProgress(0);
+    try {
+      const attachment = await uploadAttachment(user.uid, id, uri, setProgress);
+      await addAttachment(id, attachment);
+      setOrder({ ...order, attachments: [...order.attachments, attachment] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      setError("Greška pri uploadu fotografije.");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setUploading(false);
+      setProgress(0);
+    }
+  }
+
+  function confirmDeletePhoto(attachment: Attachment) {
+    Alert.alert("Brisanje fotografije", "Obrisati ovu fotografiju?", [
+      { text: "Otkaži", style: "cancel" },
+      {
+        text: "Obriši",
+        style: "destructive",
+        onPress: async () => {
+          if (!id || !order) return;
+          try {
+            await removeAttachment(id, attachment);
+            await deleteAttachmentFiles(attachment);
+            setOrder({
+              ...order,
+              attachments: order.attachments.filter((a) => a.id !== attachment.id),
+            });
+            setViewer(null);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch {
+            setError("Greška pri brisanju fotografije.");
           }
         },
       },
@@ -199,6 +280,48 @@ export default function OrderDetailScreen() {
         </View>
       </View>
 
+      {/* Prilozi (fotografije) */}
+      <View style={styles.card}>
+        <View style={styles.attachHeader}>
+          <Text style={styles.sectionTitle}>Fotografije</Text>
+          <Text style={styles.attachCount}>{order.attachments.length}</Text>
+        </View>
+
+        {order.attachments.length === 0 ? (
+          <Text style={styles.muted}>Nema priloženih fotografija.</Text>
+        ) : (
+          <View style={styles.thumbGrid}>
+            {order.attachments.map((a) => (
+              <Pressable key={a.id} onPress={() => setViewer(a)}>
+                <Image
+                  source={{ uri: a.thumbUrl }}
+                  style={styles.thumb}
+                  contentFit="cover"
+                  transition={150}
+                  cachePolicy="memory-disk"
+                />
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {uploading ? (
+          <View style={styles.uploadingBox}>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={styles.uploadingText}>
+              Uploadanje... {Math.round(progress * 100)}%
+            </Text>
+          </View>
+        ) : (
+          <Button
+            title="Dodaj fotografiju"
+            variant="secondary"
+            onPress={handleAddPhoto}
+            style={styles.mt}
+          />
+        )}
+      </View>
+
       <Button
         title="Uredi narudžbu"
         onPress={() => router.push(`/(app)/order/form?id=${order.id}`)}
@@ -209,6 +332,31 @@ export default function OrderDetailScreen() {
         onPress={handleDelete}
         style={{ marginTop: spacing.sm }}
       />
+
+      {/* Full-screen pregled fotografije */}
+      <Modal visible={!!viewer} transparent animationType="fade">
+        <View style={styles.viewerBackdrop}>
+          <View style={styles.viewerBar}>
+            <Pressable onPress={() => setViewer(null)} hitSlop={10}>
+              <Ionicons name="close" size={28} color={colors.white} />
+            </Pressable>
+            <Pressable
+              onPress={() => viewer && confirmDeletePhoto(viewer)}
+              hitSlop={10}
+            >
+              <Ionicons name="trash-outline" size={26} color={colors.white} />
+            </Pressable>
+          </View>
+          {viewer ? (
+            <Image
+              source={{ uri: viewer.url }}
+              style={styles.viewerImage}
+              contentFit="contain"
+              transition={150}
+            />
+          ) : null}
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -286,4 +434,43 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   statusChipText: { fontSize: fontSize.sm, fontWeight: "600" },
+  // Prilozi
+  muted: { fontSize: fontSize.sm, color: colors.textMuted },
+  mt: { marginTop: spacing.md },
+  attachHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  attachCount: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+  },
+  thumbGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  thumb: {
+    width: 88,
+    height: 88,
+    borderRadius: radius.md,
+    backgroundColor: colors.border,
+  },
+  uploadingBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  uploadingText: { fontSize: fontSize.sm, color: colors.textMuted },
+  // Full-screen pregled
+  viewerBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.95)" },
+  viewerBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+    paddingTop: 50,
+    paddingBottom: spacing.md,
+  },
+  viewerImage: { flex: 1, width: "100%" },
 });

@@ -35,7 +35,20 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Aplikacija koristi galeriju za odabir fotografija uz narudžbu.",
+          "cameraPermission": "Aplikacija koristi kameru za snimanje fotografija uz narudžbu."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Aplikacija koristi lokaciju za bilježenje mjesta dostave narudžbe."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false,

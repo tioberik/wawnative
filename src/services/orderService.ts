@@ -1,7 +1,10 @@
 import { firestore } from "@/lib/firebase";
 import type { Order, OrderInput, OrderStatus } from "@/types/order";
+import type { Attachment } from "@/types/order";
 import {
   addDoc,
+  arrayRemove,
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -34,10 +37,10 @@ export function subscribeOrders(
   return onSnapshot(
     q,
     (snapshot) => {
-      const list: Order[] = snapshot.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<Order, "id">),
-      }));
+      const list: Order[] = snapshot.docs.map((d) => {
+        const data = d.data() as Omit<Order, "id">;
+        return { id: d.id, ...data, attachments: data.attachments ?? [] };
+      });
       onData(list);
     },
     (error) => onError(error)
@@ -48,7 +51,8 @@ export function subscribeOrders(
 export async function getOrder(id: string): Promise<Order | null> {
   const snap = await getDoc(doc(firestore, COLLECTION, id));
   if (!snap.exists()) return null;
-  return { id: snap.id, ...(snap.data() as Omit<Order, "id">) };
+  const data = snap.data() as Omit<Order, "id">;
+  return { id: snap.id, ...data, attachments: data.attachments ?? [] };
 }
 
 /** Kreiraj novu narudžbu. */
@@ -58,6 +62,7 @@ export async function createOrder(
 ): Promise<string> {
   const ref = await addDoc(collection(firestore, COLLECTION), {
     ...input,
+    attachments: [],
     ownerId,
     createdAt: serverTimestamp(),
   });
@@ -83,4 +88,24 @@ export async function updateOrderStatus(
 /** Obriši narudžbu. */
 export async function deleteOrder(id: string): Promise<void> {
   await deleteDoc(doc(firestore, COLLECTION, id));
+}
+
+/** Dodaj prilog u narudžbu (u attachments niz). */
+export async function addAttachment(
+  orderId: string,
+  attachment: Attachment
+): Promise<void> {
+  await updateDoc(doc(firestore, COLLECTION, orderId), {
+    attachments: arrayUnion(attachment),
+  });
+}
+
+/** Ukloni prilog iz narudžbe (iz attachments niza). */
+export async function removeAttachment(
+  orderId: string,
+  attachment: Attachment
+): Promise<void> {
+  await updateDoc(doc(firestore, COLLECTION, orderId), {
+    attachments: arrayRemove(attachment),
+  });
 }

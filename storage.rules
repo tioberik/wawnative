@@ -1,0 +1,15 @@
+rules_version = '2';
+
+// Sigurnosna pravila za Firebase Storage.
+// Datoteke se spremaju pod putanjom orders/{uid}/... — korisnik smije čitati
+// i pisati ISKLJUČIVO datoteke unutar svoje mape (uid iz tokena).
+// Neprijavljeni korisnici nemaju pristup.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /orders/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == userId;
+    }
+  }
+}

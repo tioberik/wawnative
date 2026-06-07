@@ -9,6 +9,7 @@ import {
   type Auth,
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseOptions: FirebaseOptions = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -38,3 +39,4 @@ try {
 
 export { app, auth };
 export const firestore = getFirestore(app);
+export const storage = getStorage(app);

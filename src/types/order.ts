@@ -27,6 +27,17 @@ export type GeoLocation = {
   lng: number;
 };
 
+/** Foto prilog uz narudžbu (spremljen u Firebase Storage). */
+export type Attachment = {
+  id: string;          // jedinstveni id priloga
+  url: string;         // URL pune slike
+  thumbUrl: string;    // URL umanjene sličice (thumbnail)
+  path: string;        // putanja pune slike u Storage-u (za brisanje)
+  thumbPath: string;   // putanja thumbnaila u Storage-u
+  name: string;        // naziv datoteke
+  uploadedAt: number;  // timestamp (ms)
+};
+
 /** Narudžba kako je spremljena u Firestore-u. */
 export type Order = {
   id: string;
@@ -36,6 +47,7 @@ export type Order = {
   codAmount: number;
   note: string;
   location: GeoLocation | null;
+  attachments: Attachment[];
   ownerId: string;
   createdAt: Timestamp | null;
 };

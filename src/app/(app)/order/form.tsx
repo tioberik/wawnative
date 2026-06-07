@@ -3,17 +3,30 @@ import ErrorMessage from "@/components/ui/ErrorMessage";
 import Input from "@/components/ui/Input";
 import Screen from "@/components/ui/Screen";
 import { useAuth } from "@/contexts/AuthContext";
+import { pickFromCamera, pickFromLibrary } from "@/lib/imagePicker";
+import { openInGoogleMaps } from "@/lib/maps";
 import { getCustomers } from "@/services/customerService";
-import { createOrder, getOrder, updateOrder } from "@/services/orderService";
+import {
+  addAttachment,
+  createOrder,
+  getOrder,
+  removeAttachment,
+  updateOrder,
+} from "@/services/orderService";
+import {
+  deleteAttachmentFiles,
+  uploadAttachment,
+} from "@/services/storageService";
 import { colors, fontSize, radius, spacing } from "@/theme/colors";
 import type { Customer } from "@/types/customer";
 import {
   ORDER_STATUSES,
+  type Attachment,
   type GeoLocation,
   type OrderStatus,
 } from "@/types/order";
-import { openInGoogleMaps } from "@/lib/maps";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import {
@@ -23,7 +36,7 @@ import {
   useRouter,
 } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function OrderFormScreen() {
   const { user } = useAuth();
@@ -39,6 +52,9 @@ export default function OrderFormScreen() {
   const [codAmount, setCodAmount] = useState("");
   const [note, setNote] = useState("");
   const [location, setLocation] = useState<GeoLocation | null>(null);
+
+  const [existingAttachments, setExistingAttachments] = useState<Attachment[]>([]);
+  const [pendingImages, setPendingImages] = useState<string[]>([]);
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +77,7 @@ export default function OrderFormScreen() {
           setCodAmount(o.codAmount ? String(o.codAmount) : "");
           setNote(o.note);
           setLocation(o.location);
+          setExistingAttachments(o.attachments);
         }
       } catch {
         setError("Greška pri učitavanju narudžbe.");
@@ -120,6 +137,55 @@ export default function OrderFormScreen() {
     }
   }
 
+  // Dodaj fotografiju lokalno (drži se dok se narudžba ne sačuva)
+  function handleAddPhoto() {
+    Alert.alert("Dodaj fotografiju", "Odaberite izvor", [
+      {
+        text: "Kamera",
+        onPress: async () => {
+          const uri = await pickFromCamera();
+          if (uri) setPendingImages((prev) => [...prev, uri]);
+        },
+      },
+      {
+        text: "Galerija",
+        onPress: async () => {
+          const uri = await pickFromLibrary();
+          if (uri) setPendingImages((prev) => [...prev, uri]);
+        },
+      },
+      { text: "Otkaži", style: "cancel" },
+    ]);
+  }
+
+  function removePendingImage(uri: string) {
+    setPendingImages((prev) => prev.filter((u) => u !== uri));
+  }
+
+  // Uklanjanje već uploadane fotografije (briše iz baze i Storage-a)
+  function removeExistingAttachment(attachment: Attachment) {
+    if (!id) return;
+    Alert.alert("Brisanje fotografije", "Obrisati ovu fotografiju?", [
+      { text: "Otkaži", style: "cancel" },
+      {
+        text: "Obriši",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await removeAttachment(id, attachment);
+            await deleteAttachmentFiles(attachment);
+            setExistingAttachments((prev) =>
+              prev.filter((a) => a.id !== attachment.id)
+            );
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch {
+            setError("Greška pri brisanju fotografije.");
+          }
+        },
+      },
+    ]);
+  }
+
   function validate(): boolean {
     if (!customerId) {
       setError("Odaberite kupca.");
@@ -151,11 +217,19 @@ export default function OrderFormScreen() {
         note: note.trim(),
         location,
       };
+
+      // 1. Spremi narudžbu (dobij ID — potreban za putanju priloga)
+      const orderId = isEdit && id ? id : await createOrder(user.uid, input);
       if (isEdit && id) {
         await updateOrder(id, input);
-      } else {
-        await createOrder(user.uid, input);
       }
+
+      // 2. Uploaduj sve odabrane fotografije pod tim ID-em
+      for (const uri of pendingImages) {
+        const attachment = await uploadAttachment(user.uid, orderId, uri);
+        await addAttachment(orderId, attachment);
+      }
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch {
@@ -309,6 +383,52 @@ export default function OrderFormScreen() {
         style={styles.mt}
       />
 
+      {/* Fotografije — postojeće (uploadane) + nove (lokalne, čekaju spremanje) */}
+      <Text style={styles.label}>Fotografije</Text>
+      {existingAttachments.length === 0 && pendingImages.length === 0 ? (
+        <Text style={styles.muted}>Dodajte fotografije uz narudžbu (opcionalno).</Text>
+      ) : (
+        <View style={styles.thumbGrid}>
+          {/* Postojeće (već uploadane) */}
+          {existingAttachments.map((a) => (
+            <View key={a.id} style={styles.pendingThumbWrap}>
+              <Image
+                source={{ uri: a.thumbUrl }}
+                style={styles.pendingThumb}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+              />
+              <Pressable
+                style={styles.removeThumbBtn}
+                onPress={() => removeExistingAttachment(a)}
+                hitSlop={6}
+              >
+                <Ionicons name="close-circle" size={22} color={colors.danger} />
+              </Pressable>
+            </View>
+          ))}
+          {/* Nove (lokalne) */}
+          {pendingImages.map((uri) => (
+            <View key={uri} style={styles.pendingThumbWrap}>
+              <Image source={{ uri }} style={styles.pendingThumb} contentFit="cover" />
+              <Pressable
+                style={styles.removeThumbBtn}
+                onPress={() => removePendingImage(uri)}
+                hitSlop={6}
+              >
+                <Ionicons name="close-circle" size={22} color={colors.danger} />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      )}
+      <Button
+        title="Dodaj fotografiju"
+        variant="secondary"
+        onPress={handleAddPhoto}
+        style={styles.mt}
+      />
+
       <Button
         title={isEdit ? "Spremi izmjene" : "Kreiraj narudžbu"}
         onPress={handleSave}
@@ -340,6 +460,22 @@ const styles = StyleSheet.create({
   chipText: { fontSize: fontSize.sm, fontWeight: "600", color: colors.textMuted },
   chipTextActive: { color: colors.white },
   mt: { marginTop: spacing.sm },
+  // Fotografije (pending)
+  thumbGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  pendingThumbWrap: { position: "relative" },
+  pendingThumb: {
+    width: 88,
+    height: 88,
+    borderRadius: radius.md,
+    backgroundColor: colors.border,
+  },
+  removeThumbBtn: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    backgroundColor: colors.white,
+    borderRadius: radius.full,
+  },
   // Tražilica kupca
   selectedCustomer: {
     flexDirection: "row",
