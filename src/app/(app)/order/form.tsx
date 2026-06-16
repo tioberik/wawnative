@@ -1,5 +1,6 @@
 import Button from "@/components/ui/Button";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import LevelModal from "@/components/LevelModal";
 import Input from "@/components/ui/Input";
 import Screen from "@/components/ui/Screen";
 import { useAuth } from "@/contexts/AuthContext";
@@ -55,6 +56,7 @@ export default function OrderFormScreen() {
 
   const [existingAttachments, setExistingAttachments] = useState<Attachment[]>([]);
   const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const [levelVisible, setLevelVisible] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -140,13 +142,7 @@ export default function OrderFormScreen() {
   // Dodaj fotografiju lokalno (drži se dok se narudžba ne sačuva)
   function handleAddPhoto() {
     Alert.alert("Dodaj fotografiju", "Odaberite izvor", [
-      {
-        text: "Kamera",
-        onPress: async () => {
-          const uri = await pickFromCamera();
-          if (uri) setPendingImages((prev) => [...prev, uri]);
-        },
-      },
+      { text: "Kamera", onPress: () => setLevelVisible(true) },
       {
         text: "Galerija",
         onPress: async () => {
@@ -156,6 +152,12 @@ export default function OrderFormScreen() {
       },
       { text: "Otkaži", style: "cancel" },
     ]);
+  }
+
+  async function captureFromCamera() {
+    setLevelVisible(false);
+    const uri = await pickFromCamera();
+    if (uri) setPendingImages((prev) => [...prev, uri]);
   }
 
   function removePendingImage(uri: string) {
@@ -434,6 +436,13 @@ export default function OrderFormScreen() {
         onPress={handleSave}
         loading={saving}
         style={styles.saveBtn}
+      />
+
+      {/* Libela prije snimanja kamerom */}
+      <LevelModal
+        visible={levelVisible}
+        onClose={() => setLevelVisible(false)}
+        onCapture={captureFromCamera}
       />
     </Screen>
   );

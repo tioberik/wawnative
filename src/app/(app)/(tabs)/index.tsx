@@ -1,12 +1,14 @@
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
+import { useShake } from "@/hooks/useShake";
 import { subscribeOrders } from "@/services/orderService";
 import { colors, fontSize, radius, spacing } from "@/theme/colors";
 import type { Order } from "@/types/order";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -24,6 +26,24 @@ export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [shakeFlash, setShakeFlash] = useState(false);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Shake-to-refresh: protresi telefon → osvježi listu (značajka temeljena na senzoru).
+  // Lista je već real-time (onSnapshot), pa protresanje daje vizualnu/taktilnu potvrdu
+  // da su podaci aktuelni.
+  useShake(() => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShakeFlash(true);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setShakeFlash(false), 1500);
+  });
+
+  useEffect(() => {
+    return () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -81,6 +101,13 @@ export default function OrdersScreen() {
         </View>
       ) : null}
 
+      {shakeFlash ? (
+        <View style={styles.shakeFlash}>
+          <Ionicons name="refresh" size={16} color={colors.white} />
+          <Text style={styles.shakeFlashText}>Lista je osvježena</Text>
+        </View>
+      ) : null}
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -109,6 +136,15 @@ export default function OrdersScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
+  shakeFlash: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.success,
+    paddingVertical: spacing.sm,
+  },
+  shakeFlashText: { color: colors.white, fontSize: fontSize.sm, fontWeight: "600" },
   pad: { padding: spacing.md },
   center: {
     flex: 1,

@@ -32,6 +32,15 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="sensors"
+        options={{
+          title: "Senzori",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="speedometer-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profil",

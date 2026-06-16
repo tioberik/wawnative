@@ -1,5 +1,6 @@
 import Button from "@/components/ui/Button";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import LevelModal from "@/components/LevelModal";
 import Screen from "@/components/ui/Screen";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -52,6 +53,7 @@ export default function OrderDetailScreen() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [viewer, setViewer] = useState<Attachment | null>(null);
+  const [levelVisible, setLevelVisible] = useState(false);
 
   // Učitaj narudžbu + kupca svaki put kad ekran dobije fokus
   // (npr. nakon povratka iz uređivanja).
@@ -118,10 +120,10 @@ export default function OrderDetailScreen() {
     ]);
   }
 
-  // Ponudi izbor izvora slike (kamera ili galerija)
+  // Ponudi izbor izvora slike (kamera kroz libelu, ili galerija)
   function handleAddPhoto() {
     Alert.alert("Dodaj fotografiju", "Odaberite izvor", [
-      { text: "Kamera", onPress: () => addPhoto("camera") },
+      { text: "Kamera", onPress: () => setLevelVisible(true) },
       { text: "Galerija", onPress: () => addPhoto("library") },
       { text: "Otkaži", style: "cancel" },
     ]);
@@ -331,6 +333,16 @@ export default function OrderDetailScreen() {
         variant="ghost"
         onPress={handleDelete}
         style={{ marginTop: spacing.sm }}
+      />
+
+      {/* Libela prije snimanja kamerom */}
+      <LevelModal
+        visible={levelVisible}
+        onClose={() => setLevelVisible(false)}
+        onCapture={() => {
+          setLevelVisible(false);
+          addPhoto("camera");
+        }}
       />
 
       {/* Full-screen pregled fotografije */}

@@ -17,32 +17,32 @@ type Props = {
   edges?: Edge[];
 };
 
-/** Osnovni wrapper ekrana — safe area, padding, opcionalni scroll/centriranje. */
+/** Osnovni wrapper ekrana — safe area, padding, opcionalni scroll/centriranje.
+ * Sa scroll=true sadržaj se može pomicati iznad tipkovnice (bez prekrivanja polja). */
 export default function Screen({
   children,
   scroll = false,
   center = false,
   edges = ["top", "bottom"],
 }: Props) {
-  const content = (
-    <View style={[styles.inner, center && styles.center]}>{children}</View>
-  );
-
   return (
     <SafeAreaView style={styles.safe} edges={edges}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         {scroll ? (
           <ScrollView
-            contentContainerStyle={styles.scrollContent}
+            style={styles.flex}
+            contentContainerStyle={[styles.scrollContent, center && styles.center]}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            showsVerticalScrollIndicator={false}
           >
-            {content}
+            {children}
           </ScrollView>
         ) : (
-          content
+          <View style={[styles.inner, center && styles.center]}>{children}</View>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -57,8 +57,10 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
+  // Za scroll varijantu: padding ide ovdje, flexGrow dopušta i centriranje i scroll
   scrollContent: {
     flexGrow: 1,
+    padding: spacing.lg,
   },
   inner: {
     flex: 1,
