@@ -12,6 +12,7 @@ import { StyleSheet, Text, View } from "react-native";
 export default function RegisterScreen() {
   const { register } = useAuth();
 
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -19,8 +20,12 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
 
   function validate(): boolean {
-    if (!email.trim() || !password || !confirm) {
+    if (!name.trim() || !email.trim() || !password || !confirm) {
       setError("Popunite sva polja.");
+      return false;
+    }
+    if (name.trim().length < 3) {
+      setError("Unesite ime i prezime.");
       return false;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
@@ -46,7 +51,7 @@ export default function RegisterScreen() {
     }
     setLoading(true);
     try {
-      await register(email, password);
+      await register(name, email, password);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Nakon uspješne registracije Firebase automatski prijavljuje korisnika;
       // root navigator preusmjerava na početni ekran.
@@ -67,6 +72,14 @@ export default function RegisterScreen() {
 
       <ErrorMessage message={error} />
 
+      <Input
+        label="Ime i prezime"
+        value={name}
+        onChangeText={setName}
+        placeholder="Tio Berik"
+        autoCapitalize="words"
+        autoComplete="name"
+      />
       <Input
         label="Email"
         value={email}

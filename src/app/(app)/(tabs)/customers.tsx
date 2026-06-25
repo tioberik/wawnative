@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function CustomersScreen() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const router = useRouter();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -28,7 +28,6 @@ export default function CustomersScreen() {
     if (!user) return;
     setLoading(true);
     const unsubscribe = subscribeCustomers(
-      user.uid,
       (list) => {
         setCustomers(list);
         setLoading(false);
@@ -57,6 +56,9 @@ export default function CustomersScreen() {
           <Text style={styles.name}>{item.name}</Text>
           <Text style={styles.sub}>{item.phone}</Text>
           {item.city ? <Text style={styles.sub}>{item.city}</Text> : null}
+          {isAdmin && item.ownerName ? (
+            <Text style={styles.owner}>Kreirao: {item.ownerName}</Text>
+          ) : null}
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textLight} />
       </Pressable>
@@ -145,6 +147,7 @@ const styles = StyleSheet.create({
   rowInfo: { flex: 1 },
   name: { fontSize: fontSize.md, fontWeight: "600", color: colors.text },
   sub: { fontSize: fontSize.sm, color: colors.textMuted },
+  owner: { fontSize: fontSize.xs, color: colors.textLight, marginTop: 2 },
   fab: {
     position: "absolute",
     right: spacing.lg,

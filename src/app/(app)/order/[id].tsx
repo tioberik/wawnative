@@ -235,6 +235,7 @@ export default function OrderDetailScreen() {
 
         <View style={styles.divider} />
         <Row label="Otkupnina (SDS)" value={`${order.codAmount.toFixed(2)} KM`} />
+        {order.ownerName ? <Row label="Kreirao" value={order.ownerName} /> : null}
         {order.note ? <Row label="Napomena" value={order.note} /> : null}
         {order.location ? (
           <View style={styles.row}>

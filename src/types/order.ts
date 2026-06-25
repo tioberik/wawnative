@@ -49,6 +49,7 @@ export type Order = {
   location: GeoLocation | null;
   attachments: Attachment[];
   ownerId: string;
+  ownerName?: string; // ime korisnika koji je kreirao (denormalizovano)
   createdAt: Timestamp | null;
 };
 

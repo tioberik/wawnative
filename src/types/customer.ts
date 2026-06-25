@@ -8,6 +8,7 @@ export type Customer = {
   address: string;
   city: string;
   ownerId: string;
+  ownerName?: string; // ime korisnika koji je kreirao (denormalizovano)
   createdAt: Timestamp | null;
 };
 

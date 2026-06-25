@@ -20,7 +20,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function OrdersScreen() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const router = useRouter();
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -50,6 +50,7 @@ export default function OrdersScreen() {
     setLoading(true);
     const unsubscribe = subscribeOrders(
       user.uid,
+      isAdmin,
       (list) => {
         setOrders(list);
         setLoading(false);
@@ -61,7 +62,7 @@ export default function OrdersScreen() {
       }
     );
     return unsubscribe;
-  }, [user]);
+  }, [user, isAdmin]);
 
   function renderItem({ item }: { item: Order }) {
     return (
@@ -73,6 +74,12 @@ export default function OrdersScreen() {
           <Text style={styles.customer}>{item.customerName || "Bez kupca"}</Text>
           <StatusBadge status={item.status} />
         </View>
+        {isAdmin && item.ownerName ? (
+          <View style={styles.ownerRow}>
+            <Ionicons name="person-outline" size={13} color={colors.textLight} />
+            <Text style={styles.ownerText}>{item.ownerName}</Text>
+          </View>
+        ) : null}
         {item.note ? (
           <Text style={styles.note} numberOfLines={1}>
             {item.note}
@@ -174,6 +181,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   customer: { fontSize: fontSize.md, fontWeight: "700", color: colors.text, flex: 1 },
+  ownerRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: spacing.xs },
+  ownerText: { fontSize: fontSize.xs, color: colors.textLight },
   note: { fontSize: fontSize.sm, color: colors.textMuted, marginTop: spacing.xs },
   cardBottom: {
     flexDirection: "row",

@@ -9,14 +9,14 @@ import {
   getCustomer,
   updateCustomer,
 } from "@/services/customerService";
-import { spacing } from "@/theme/colors";
+import { colors, fontSize, spacing } from "@/theme/colors";
 import * as Haptics from "expo-haptics";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, StyleSheet, Text } from "react-native";
 
 export default function CustomerFormScreen() {
-  const { user } = useAuth();
+  const { user, isAdmin, displayName } = useAuth();
   const router = useRouter();
   const { id, name: prefillName } = useLocalSearchParams<{
     id?: string;
@@ -28,9 +28,14 @@ export default function CustomerFormScreen() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [createdByName, setCreatedByName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+
+  // Kupca briše samo vlasnik (onaj koji ga je kreirao) ili admin.
+  const canDelete = isEdit && (isAdmin || (!!ownerId && ownerId === user?.uid));
 
   // Učitaj postojećeg kupca u edit modu
   useEffect(() => {
@@ -43,6 +48,8 @@ export default function CustomerFormScreen() {
           setPhone(c.phone);
           setAddress(c.address);
           setCity(c.city);
+          setOwnerId(c.ownerId);
+          setCreatedByName(c.ownerName ?? null);
         }
       } catch {
         setError("Greška pri učitavanju kupca.");
@@ -83,7 +90,7 @@ export default function CustomerFormScreen() {
       if (isEdit && id) {
         await updateCustomer(id, input);
       } else {
-        await createCustomer(user.uid, input);
+        await createCustomer(user.uid, displayName ?? "", input);
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
@@ -121,6 +128,10 @@ export default function CustomerFormScreen() {
 
       <ErrorMessage message={error} />
 
+      {isEdit && createdByName ? (
+        <Text style={styles.createdBy}>Kreirao: {createdByName}</Text>
+      ) : null}
+
       <Input
         label="Ime i prezime *"
         value={name}
@@ -157,7 +168,7 @@ export default function CustomerFormScreen() {
         loading={saving}
       />
 
-      {isEdit && (
+      {canDelete && (
         <Button
           title="Obriši kupca"
           variant="ghost"
@@ -168,3 +179,11 @@ export default function CustomerFormScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  createdBy: {
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+  },
+});

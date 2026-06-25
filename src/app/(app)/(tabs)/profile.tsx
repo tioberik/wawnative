@@ -4,12 +4,15 @@ import Input from "@/components/ui/Input";
 import Screen from "@/components/ui/Screen";
 import { useAuth } from "@/contexts/AuthContext";
 import { colors, fontSize, radius, spacing } from "@/theme/colors";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 export default function ProfileScreen() {
   const {
     user,
+    displayName,
+    updateDisplayName,
+    isAdmin,
     logout,
     biometricAvailable,
     biometricEnabled,
@@ -20,6 +23,31 @@ export default function ProfileScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const [nameInput, setNameInput] = useState(displayName ?? "");
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [savingName, setSavingName] = useState(false);
+
+  // Drži polje sinhronizovano s imenom iz konteksta (npr. kad se učita).
+  useEffect(() => {
+    setNameInput(displayName ?? "");
+  }, [displayName]);
+
+  async function handleSaveName() {
+    setNameError(null);
+    if (nameInput.trim().length < 3) {
+      setNameError("Unesite ime i prezime.");
+      return;
+    }
+    setSavingName(true);
+    try {
+      await updateDisplayName(nameInput);
+    } catch {
+      setNameError("Greška pri spremanju imena.");
+    } finally {
+      setSavingName(false);
+    }
+  }
 
   async function handleEnableBiometric() {
     setError(null);
@@ -55,8 +83,32 @@ export default function ProfileScreen() {
     <Screen scroll edges={["bottom"]}>
       <View style={styles.card}>
         <Text style={styles.welcome}>Dobrodošli 👋</Text>
+        {displayName ? <Text style={styles.name}>{displayName}</Text> : null}
         <Text style={styles.email}>{user?.email}</Text>
-        <Text style={styles.note}>Prijavljeni ste na svoj račun.</Text>
+        <Text style={styles.note}>
+          {isAdmin ? "Prijavljeni ste kao administrator." : "Prijavljeni ste na svoj račun."}
+        </Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Ime i prezime</Text>
+        <Text style={styles.muted}>
+          Ime se prikazuje uz narudžbe i kupce koje kreirate.
+        </Text>
+        <ErrorMessage message={nameError} />
+        <Input
+          label="Ime i prezime"
+          value={nameInput}
+          onChangeText={setNameInput}
+          placeholder="Tio Berik"
+          autoCapitalize="words"
+          style={styles.mt}
+        />
+        <Button
+          title="Spremi ime"
+          onPress={handleSaveName}
+          loading={savingName}
+        />
       </View>
 
       <View style={styles.card}>
@@ -117,6 +169,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   welcome: { fontSize: fontSize.xl, fontWeight: "700", color: colors.text },
+  name: {
+    fontSize: fontSize.lg,
+    fontWeight: "700",
+    color: colors.text,
+    marginTop: spacing.xs,
+  },
   email: {
     fontSize: fontSize.md,
     color: colors.primary,

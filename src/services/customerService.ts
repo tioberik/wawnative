@@ -12,24 +12,21 @@ import {
   query,
   serverTimestamp,
   updateDoc,
-  where,
 } from "firebase/firestore";
 
 const COLLECTION = "customers";
 
 /**
- * Real-time pretplata na kupce prijavljenog korisnika.
- * Vraća funkciju za odjavu (unsubscribe). Lista se automatski osvježava
- * pri svakoj promjeni u bazi.
+ * Real-time pretplata na kupce. Kupci su dijeljeni — svi prijavljeni korisnici
+ * vide sve kupce. Vraća funkciju za odjavu (unsubscribe). Lista se automatski
+ * osvježava pri svakoj promjeni u bazi.
  */
 export function subscribeCustomers(
-  ownerId: string,
   onData: (customers: Customer[]) => void,
   onError: (error: Error) => void
 ): () => void {
   const q = query(
     collection(firestore, COLLECTION),
-    where("ownerId", "==", ownerId),
     orderBy("name", "asc")
   );
 
@@ -46,11 +43,10 @@ export function subscribeCustomers(
   );
 }
 
-/** Dohvati sve kupce prijavljenog korisnika (jednokratno) — npr. za izbor u formi. */
-export async function getCustomers(ownerId: string): Promise<Customer[]> {
+/** Dohvati sve kupce (jednokratno) — npr. za izbor u formi narudžbe. */
+export async function getCustomers(): Promise<Customer[]> {
   const q = query(
     collection(firestore, COLLECTION),
-    where("ownerId", "==", ownerId),
     orderBy("name", "asc")
   );
   const snap = await getDocs(q);
@@ -67,11 +63,13 @@ export async function getCustomer(id: string): Promise<Customer | null> {
 /** Kreiraj novog kupca. */
 export async function createCustomer(
   ownerId: string,
+  ownerName: string,
   input: CustomerInput
 ): Promise<string> {
   const ref = await addDoc(collection(firestore, COLLECTION), {
     ...input,
     ownerId,
+    ownerName,
     createdAt: serverTimestamp(),
   });
   return ref.id;

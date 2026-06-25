@@ -20,19 +20,23 @@ import {
 const COLLECTION = "orders";
 
 /**
- * Real-time pretplata na narudžbe prijavljenog korisnika.
+ * Real-time pretplata na narudžbe.
+ * Admin vidi sve narudžbe; običan korisnik samo svoje (filtrirano po ownerId).
  * Vraća funkciju za odjavu (unsubscribe).
  */
 export function subscribeOrders(
   ownerId: string,
+  isAdmin: boolean,
   onData: (orders: Order[]) => void,
   onError: (error: Error) => void
 ): () => void {
-  const q = query(
-    collection(firestore, COLLECTION),
-    where("ownerId", "==", ownerId),
-    orderBy("createdAt", "desc")
-  );
+  const q = isAdmin
+    ? query(collection(firestore, COLLECTION), orderBy("createdAt", "desc"))
+    : query(
+        collection(firestore, COLLECTION),
+        where("ownerId", "==", ownerId),
+        orderBy("createdAt", "desc")
+      );
 
   return onSnapshot(
     q,
@@ -58,12 +62,14 @@ export async function getOrder(id: string): Promise<Order | null> {
 /** Kreiraj novu narudžbu. */
 export async function createOrder(
   ownerId: string,
+  ownerName: string,
   input: OrderInput
 ): Promise<string> {
   const ref = await addDoc(collection(firestore, COLLECTION), {
     ...input,
     attachments: [],
     ownerId,
+    ownerName,
     createdAt: serverTimestamp(),
   });
   return ref.id;

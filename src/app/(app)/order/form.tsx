@@ -40,7 +40,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function OrderFormScreen() {
-  const { user } = useAuth();
+  const { user, displayName } = useAuth();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const isEdit = !!id;
@@ -93,7 +93,7 @@ export default function OrderFormScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!user) return;
-      getCustomers(user.uid)
+      getCustomers()
         .then(setCustomers)
         .catch(() => setError("Greška pri učitavanju kupaca."));
     }, [user])
@@ -221,7 +221,8 @@ export default function OrderFormScreen() {
       };
 
       // 1. Spremi narudžbu (dobij ID — potreban za putanju priloga)
-      const orderId = isEdit && id ? id : await createOrder(user.uid, input);
+      const orderId =
+        isEdit && id ? id : await createOrder(user.uid, displayName ?? "", input);
       if (isEdit && id) {
         await updateOrder(id, input);
       }

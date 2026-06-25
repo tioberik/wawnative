@@ -1,9 +1,10 @@
-import { auth } from "@/lib/firebase";
+import { auth, firestore } from "@/lib/firebase";
 import {
   deleteSecureItem,
   getSecureItem,
   setSecureItem,
 } from "@/lib/secureStorage";
+import { doc, getDoc } from "firebase/firestore";
 import * as LocalAuthentication from "expo-local-authentication";
 import {
   createUserWithEmailAndPassword,
@@ -12,6 +13,7 @@ import {
   reauthenticateWithCredential,
   signInWithEmailAndPassword,
   signOut,
+  updateProfile,
   type User,
 } from "firebase/auth";
 import {
@@ -33,10 +35,13 @@ const SK_ENABLED = "biometric_enabled";
 type AuthContextType = {
   user: User | null;
   isLoggedIn: boolean;
+  isAdmin: boolean;
+  displayName: string | null;
   authReady: boolean;
 
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
+  updateDisplayName: (name: string) => Promise<void>;
   logout: () => Promise<void>;
 
   // Biometrijska prijava (hardverska funkcionalnost)
@@ -79,14 +84,28 @@ function friendlyAuthError(error: unknown): string {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
 
-  // Prati stanje prijave kroz Firebase
+  // Prati stanje prijave kroz Firebase. Pri svakoj prijavi provjeri je li
+  // korisnik admin (postoji li dokument /admins/{uid}).
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+      setDisplayName(currentUser?.displayName ?? null);
+      if (currentUser) {
+        try {
+          const snap = await getDoc(doc(firestore, "admins", currentUser.uid));
+          setIsAdmin(snap.exists());
+        } catch {
+          setIsAdmin(false);
+        }
+      } else {
+        setIsAdmin(false);
+      }
       setAuthReady(true);
     });
     return unsubscribe;
@@ -117,12 +136,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const register = useCallback(async (email: string, password: string) => {
-    try {
-      await createUserWithEmailAndPassword(auth, email.trim(), password);
-    } catch (error) {
-      throw new Error(friendlyAuthError(error));
+  const register = useCallback(
+    async (name: string, email: string, password: string) => {
+      try {
+        const cred = await createUserWithEmailAndPassword(
+          auth,
+          email.trim(),
+          password
+        );
+        await updateProfile(cred.user, { displayName: name.trim() });
+        setDisplayName(name.trim());
+      } catch (error) {
+        throw new Error(friendlyAuthError(error));
+      }
+    },
+    []
+  );
+
+  /** Postavi/izmijeni ime i prezime prijavljenog korisnika (Firebase displayName). */
+  const updateDisplayName = useCallback(async (name: string) => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error("Niste prijavljeni.");
     }
+    await updateProfile(currentUser, { displayName: name.trim() });
+    setDisplayName(name.trim());
   }, []);
 
   const logout = useCallback(async () => {
@@ -201,9 +239,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       isLoggedIn: !!user,
+      isAdmin,
+      displayName,
       authReady,
       login,
       register,
+      updateDisplayName,
       logout,
       biometricAvailable,
       biometricEnabled,
@@ -213,9 +254,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [
       user,
+      isAdmin,
+      displayName,
       authReady,
       login,
       register,
+      updateDisplayName,
       logout,
       biometricAvailable,
       biometricEnabled,
